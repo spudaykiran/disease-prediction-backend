@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+scikit-learn
+pandas
+numpy
+joblib
+python-multipart
+pydantic==2.7.0
+loguru==0.7.2
