@@ -1,89 +1,59 @@
-import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any
-from .model_manager import ModelManager
-from .preprocess import preprocess_input
+from app.model_manager import ModelManager
+from app.preprocess import preprocess_input
+import logging
 
-# ----------------------------------------------------
-# Setup logging
-# ----------------------------------------------------
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
+    format="%(asctime)s | %(levelname)s | %(message)s"
 )
-logger = logging.getLogger(__name__)
 
-# ----------------------------------------------------
-# FastAPI app
-# ----------------------------------------------------
 app = FastAPI(title="Disease Prediction API")
 
-# Allowed origins (local + Netlify)
-allowed_origins = [
-    "http://localhost:5173",   # Vite local dev
-    "http://localhost:3000",   # CRA local dev
-    "https://predict-prevent.netlify.app",  # ✅ your deployed frontend
+# Allow frontend requests
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://predict-prevent.netlify.app",
 ]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ----------------------------------------------------
 # Load models
-# ----------------------------------------------------
 model_manager = ModelManager()
 
-# ----------------------------------------------------
 # Request schema
-# ----------------------------------------------------
 class PredictionRequest(BaseModel):
     disease: str
-    input: Dict[str, Any]
+    input: dict
 
-# ----------------------------------------------------
-# Routes
-# ----------------------------------------------------
 @app.get("/health")
-def health():
-    """Health check endpoint"""
+def health_check():
     return {"status": "ok", "models": list(model_manager.models.keys())}
 
-
 @app.post("/predict")
-def predict(request: PredictionRequest):
-    """Make prediction for a given disease"""
-    disease = request.disease
-    inputs = request.input
-
+def predict(req: PredictionRequest):
+    disease = req.disease
     if disease not in model_manager.models:
-        raise HTTPException(status_code=400, detail=f"Model for {disease} not found")
+        raise HTTPException(status_code=400, detail="Invalid disease name")
 
-    try:
-        # Preprocess input
-        features = preprocess_input(disease, inputs)
+    model = model_manager.models[disease]
+    features = preprocess_input(disease, req.input)
 
-        # Predict
-        model = model_manager.models[disease]
-        prediction = model.predict(features)[0]
-        probability = model.predict_proba(features)[0][1]
+    pred = model.predict(features)[0]
+    proba = model.predict_proba(features)[0][1]
 
-        result = {
-            "prediction": "Present" if prediction == 1 else "Not Present",
-            "probability": float(probability),
-        }
-
-        logger.info(
-            f"Prediction Request | Disease: {disease} | Inputs: {inputs} | Result: {result}"
-        )
-        return result
-
-    except Exception as e:
-        logger.error(f"Prediction error for {disease}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    result = {
+        "prediction": "Present" if pred == 1 else "Not Present",
+        "probability": float(proba),
+    }
+    logging.info(f"Prediction Request | Disease: {disease} | Inputs: {req.input} | Result: {result}")
+    return result

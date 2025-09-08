@@ -1,6 +1,4 @@
-import joblib
-from pathlib import Path
-from .config import MODELS_DIR
+import os, pickle
 
 class ModelManager:
     def __init__(self):
@@ -8,20 +6,12 @@ class ModelManager:
         self.load_all_models()
 
     def load_all_models(self):
-        """Load all trained models from the models directory."""
-        for path in MODELS_DIR.glob("*.pkl"):
-            try:
-                # Example: HeartModel.pkl → Heart
-                name = path.stem.replace("Model", "")
-                self.models[name] = joblib.load(path)
-                print(f"✅ Loaded model: {name} from {path.name}")
-            except Exception as e:
-                print(f"❌ Failed to load model {path.name}: {e}")
-
-    def get(self, disease: str):
-        """Retrieve model by disease name."""
-        return self.models.get(disease)
-
-    def list_models(self):
-        """List all available disease models."""
-        return list(self.models.keys())
+        models_path = os.path.join(os.path.dirname(__file__), "models")
+        if not os.path.exists(models_path):
+            os.makedirs(models_path)
+        for file in os.listdir(models_path):
+            if file.endswith(".pkl"):
+                name = file.replace("Model.pkl", "")
+                with open(os.path.join(models_path, file), "rb") as f:
+                    self.models[name] = pickle.load(f)
+        print(f"✅ Loaded models: {list(self.models.keys())}")
